@@ -1,12 +1,17 @@
-def apikeyProps = new Properties()
-def apikeyFile = rootProject.file("apikey.properties")
-if (apikeyFile.exists()) {
-    apikeyProps.load(new FileInputStream(apikeyFile))
+import java.util.Properties
+import java.io.FileInputStream
+val apikeyPropertiesFile = file("../../apikey.properties")
+val apikeyProperties = Properties()
+
+if (apikeyPropertiesFile.exists()) {
+    apikeyProperties.load(FileInputStream(apikeyPropertiesFile))
 }
-def mapsKey = apikeyProps.getProperty("MAPS_API_KEY")
+
+val mapsApiKey = apikeyProperties.getProperty("MAPS_API_KEY") ?: error("MAPS_API_KEY not found in apikey.properties")
+
 android {
     defaultConfig {
-        resValue "string", "google_maps_api_key", mapsKey
+        resValue("string", "google_maps_api_key", mapsApiKey)
     }
 }
 plugins {
