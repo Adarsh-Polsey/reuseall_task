@@ -11,19 +11,19 @@
 ## App Screenshots
 
 ### Location Permission Screen  
-![Permission](screenshots/a_permission.jpg)
+<img src="screenshots/a_permission.jpg" width="300"/>
 
 ### Loading State  
-![Loading](screenshots/b_loading.jpg)
+<img src="screenshots/b_loading.jpg" width="300"/>
 
 ### Map Preview (Light Theme)  
-![Map Light](screenshots/c_map_preview.jpg)
+<img src="screenshots/c_map_preview.jpg" width="300"/>
 
 ### Map Preview (Dark Theme)  
-![Map Dark](screenshots/c_map_preview_dark_theme.jpg)
+<img src="screenshots/c_map_preview_dark_theme.jpg" width="300"/>
 
 ### In-App WebView for More Info  
-![WebView](screenshots/d_more_info_inappwebview.jpg)
+<img src="screenshots/d_more_info_inappwebview.jpg" width="300"/>
 
 ### External Link via URL Launcher  
-![URL Launcher](screenshots/e_url_launcher_to_external.jpg)
+<img src="screenshots/e_url_launcher_to_external.jpg" width="300"/>
