@@ -20,6 +20,7 @@ class _JobRouteScreenState extends State<JobRouteScreen> {
   final Set<Marker> markers = {};
   final Set<Polyline> polylines = {};
   bool isLoading = true;
+  bool isMapStyleDark = false;
 
   @override
   void initState() {
@@ -93,8 +94,8 @@ class _JobRouteScreenState extends State<JobRouteScreen> {
     markers.add(
       Marker(
         markerId: const MarkerId("rider"),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         position: currentLocation!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: const InfoWindow(title: "Your Location"),
       ),
     );
@@ -118,7 +119,7 @@ class _JobRouteScreenState extends State<JobRouteScreen> {
       Marker(
         markerId: const MarkerId("warehouse"),
         position: warehouseLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         infoWindow: const InfoWindow(title: "Warehouse"),
       ),
     );
@@ -135,11 +136,17 @@ class _JobRouteScreenState extends State<JobRouteScreen> {
     polylines.add(
       Polyline(
         polylineId: const PolylineId("deliveryroute"),
-        color: Colors.blue,
-        width: 5,
+        color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+        width: 6,
+        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
         points: routePoints,
       ),
     );
+  }
+
+  void toggleMapStyle() async {
+    isMapStyleDark = !isMapStyleDark;
+    setState(() {});
   }
 
   void navigateToGoogleMaps() async {
@@ -173,67 +180,222 @@ class _JobRouteScreenState extends State<JobRouteScreen> {
   }
 
   void showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(15, 5, 15, 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Delivery Route'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Stack(
-                children: [
-                  GoogleMap(
-                    onMapCreated: (controller) => mapController = controller,
-                    initialCameraPosition: CameraPosition(
-                      target: currentLocation!,
-                      zoom: 14,
-                    ),
-                    markers: markers,
-                    polylines: polylines,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    zoomControlsEnabled: false,
-                  ),
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    child: buildNavigationButton(),
-                  ),
-                ],
+    return SafeArea(
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            Container(
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: !isMapStyleDark ? Colors.black45 : Colors.white70,
               ),
+              child: IconButton(
+                icon: Icon(
+                  isMapStyleDark ? Icons.light_mode : Icons.dark_mode,
+                  color: isMapStyleDark ? Colors.black45 : Colors.white70,
+                ),
+                onPressed: toggleMapStyle,
+                tooltip: isMapStyleDark ? 'Light mode' : 'Dark mode',
+              ),
+            ),
+          ],
+        ),
+        body:
+            isLoading
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text('Loading your route...'),
+                    ],
+                  ),
+                )
+                : Stack(
+                  children: [
+                    GoogleMap(
+                      style:
+                          isMapStyleDark
+                              ? '[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263c"}]}]'
+                              : '[]',
+                      onMapCreated: (controller) {
+                        mapController = controller;
+                        if (isMapStyleDark) {
+                          toggleMapStyle();
+                        }
+                      },
+                      initialCameraPosition: CameraPosition(
+                        target: currentLocation!,
+                        zoom: 14,
+                      ),
+                      markers: markers,
+                      polylines: polylines,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                    ),
+                    Positioned(
+                      top: 100,
+                      right: 16,
+                      child: FloatingActionButton(
+                        backgroundColor:
+                            !isMapStyleDark ? Colors.black45 : Colors.white70,
+                        onPressed: () {
+                          mapController.animateCamera(
+                            CameraUpdate.newLatLng(currentLocation!),
+                          );
+                        },
+                        child: Icon(
+                          Icons.my_location,
+                          size: 20,
+                          color:
+                              isMapStyleDark ? Colors.black45 : Colors.white60,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 24,
+                      left: 24,
+                      right: 24,
+                      child: buildNavigationCard(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 15.0),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: GestureDetector(
+                          onTap: navigateToGoogleMaps,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color:
+                                  !isMapStyleDark
+                                      ? Colors.black.withAlpha(150)
+                                      : Colors.white70,
+                              shape: BoxShape.rectangle,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  spacing: 5,
+                                  children: [
+                                    Icon(Icons.location_on, color: Colors.red),
+                                    Icon(
+                                      Icons.location_on,
+                                      color: Colors.yellow,
+                                    ),
+                                    Icon(
+                                      Icons.location_on,
+                                      color: Colors.green,
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  spacing: 10,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      "Origin",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            isMapStyleDark
+                                                ? Colors.black54
+                                                : Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      "Pickup points",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            isMapStyleDark
+                                                ? Colors.black54
+                                                : Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      "Destination",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color:
+                                            isMapStyleDark
+                                                ? Colors.black54
+                                                : Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+      ),
     );
   }
 
-  Widget buildNavigationButton() {
-    return ElevatedButton(
-      onPressed: navigateToGoogleMaps,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 3,
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.directions),
-          SizedBox(width: 8),
-          Text(
-            "Start Navigation",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+  Widget buildNavigationCard() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15.0),
+      child: Align(
+        alignment: Alignment.center,
+        child: GestureDetector(
+          onTap: navigateToGoogleMaps,
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: !isMapStyleDark ? Colors.black54 : Colors.white60,
+              shape: BoxShape.rectangle,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.navigation,
+                  size: 25,
+                  color: isMapStyleDark ? Colors.black87 : Colors.white70,
+                ),
+                Text(
+                  "Start navigation",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isMapStyleDark ? Colors.black87 : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
