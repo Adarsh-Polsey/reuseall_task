@@ -1,16 +1,29 @@
 # reuse_task
 
-A new Flutter project.
+## Objective
 
-## Getting Started
+- Build a Flutter app screen for riders to:
+  - Display rider's current location on a map.
+  - Show markers for pickup locations and warehouse.
+  - Draw a full route from rider's current location through all pickups and ending at the warehouse.
+  - Enable a navigation experience using a 'Navigate' button to launch either in-app navigation or Google Maps.
 
-This project is a starting point for a Flutter application.
+## App Screenshots
 
-A few resources to get you started if this is your first Flutter project:
+### Location Permission Screen  
+![Permission](screenshots/a_permission.jpg)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### Loading State  
+![Loading](screenshots/b_loading.jpg)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Map Preview (Light Theme)  
+![Map Light](screenshots/c_map_preview.jpg)
+
+### Map Preview (Dark Theme)  
+![Map Dark](screenshots/c_map_preview_dark_theme.jpg)
+
+### In-App WebView for More Info  
+![WebView](screenshots/d_more_info_inappwebview.jpg)
+
+### External Link via URL Launcher  
+![URL Launcher](screenshots/e_url_launcher_to_external.jpg)
