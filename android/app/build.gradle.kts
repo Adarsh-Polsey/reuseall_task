@@ -1,6 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
-val apikeyPropertiesFile = file("../../apikey.properties")
+val apikeyPropertiesFile = file("../../.env")
 val apikeyProperties = Properties()
 
 if (apikeyPropertiesFile.exists()) {

@@ -1,14 +1,13 @@
-
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:reuse_task/maps_webview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math';
+
 class JobRouteScreen extends StatefulWidget {
   const JobRouteScreen({super.key});
-  
+
   @override
   State<JobRouteScreen> createState() => _JobRouteScreenState();
 }
@@ -16,153 +15,135 @@ class JobRouteScreen extends StatefulWidget {
 class _JobRouteScreenState extends State<JobRouteScreen> {
   late GoogleMapController mapController;
   LatLng? currentLocation;
-  Set<Marker> markers = {};
-  Set<Polyline> polylines = {};
-static const List<LatLng> pickupLocations = [
-  LatLng(12.971598, 77.594566),
-  LatLng(12.972819, 77.595212),
-  LatLng(12.963842, 77.609043),
-];
+  List<LatLng> pickupLocations = [];
+  late LatLng warehouseLocation;
+  final Set<Marker> markers = {};
+  final Set<Polyline> polylines = {};
+  bool isLoading = true;
 
-static const LatLng warehouseLocation = LatLng(12.961115, 77.600000);
   @override
   void initState() {
     super.initState();
-    _initLocationAndMap();
+    initLocationAndMap();
   }
 
-  Future<void> _initLocationAndMap() async {
+  Future<void> initLocationAndMap() async {
     try {
-      log("Requesting location permissions...");
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        log("Location services are disabled.");
-        return;
-      }
+      await checkLocationPermission();
+      await getCurrentLocation();
+      generateLocations();
+      createMarkers();
+      await createRoute();
 
-      LocationPermission permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        log("Location permission denied.");
-        return;
-      }
-
-      log("Fetching current position...");
-      Position position = await Geolocator.getCurrentPosition();
-      currentLocation = LatLng(position.latitude, position.longitude);
-      log("Current location: $currentLocation");
-
-      markers.add(
-        Marker(markerId: MarkerId("rider"), position: currentLocation!),
-      );
-      for (int i = 0; i < pickupLocations.length; i++) {
-        markers.add(
-          Marker(markerId: MarkerId("pickup$i"), position: pickupLocations[i]),
-        );
-      }
-      markers.add(
-        Marker(markerId: MarkerId("warehouse"), position: warehouseLocation),
-      );
-
-      await _drawRoute();
-
-      setState(() {});
+      setState(() {
+        isLoading = false;
+      });
     } catch (e) {
-      log("Error during location/map setup: $e");
+      showErrorSnackBar("Error setting up map: $e");
     }
   }
 
-  Future<void> _drawRoute() async {
-    try {
-      log("Requesting polyline from Directions API...");
-      final PolylinePoints polylinePoints = PolylinePoints();
-      final PolylineResult polyline = await polylinePoints
-          .getRouteBetweenCoordinates(
-            request: PolylineRequest(
-              origin: PointLatLng(
-                currentLocation!.latitude,
-                currentLocation!.longitude,
-              ),
-              destination: PointLatLng(
-                warehouseLocation.latitude,
-                warehouseLocation.longitude,
-              ),
-              mode: TravelMode.driving,
-              wayPoints:
-                  pickupLocations
-                      .map(
-                        (e) => PolylineWayPoint(
-                          location: '${e.latitude},${e.longitude}',
-                        ),
-                      )
-                      .toList(),
-            ),
-            googleApiKey: 'AIzaSyDG7mXB-JgXTRrp8FIxg4myC4Kd6BVBORE',
-          );
+  Future<void> checkLocationPermission() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception("Location services are disabled");
+    }
 
-      if (polyline.status == 'OK' && polyline.points.isNotEmpty) {
-        List<LatLng> routeCoords =
-            polyline.points
-                .map((e) => LatLng(e.latitude, e.longitude))
-                .toList();
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception("Location permission denied");
+      }
+    }
 
-        log("Polyline fetched with ${routeCoords.length} points.");
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception("Location permissions permanently denied");
+    }
+  }
 
-        polylines.add(
-          Polyline(
-            polylineId: PolylineId("route"),
-            color: Colors.blue,
-            width: 5,
-            points: routeCoords,
+  Future<void> getCurrentLocation() async {
+    final position = await Geolocator.getCurrentPosition();
+    currentLocation = LatLng(position.latitude, position.longitude);
+  }
+
+  void generateLocations() {
+    pickupLocations = List.generate(
+      3,
+      (_) => generateNearbyLocation(currentLocation!, 5),
+    );
+    warehouseLocation = generateNearbyLocation(currentLocation!, 5);
+  }
+
+  LatLng generateNearbyLocation(LatLng center, double radiusInKm) {
+    final random = Random();
+    final u = random.nextDouble();
+    final v = random.nextDouble();
+    final w = radiusInKm / 111.0 * sqrt(u);
+    final t = 2 * pi * v;
+    final x = w * cos(t);
+    final y = w * sin(t);
+    final newLat = center.latitude + x;
+    final newLng = center.longitude + y / cos(center.latitude * pi / 180);
+    return LatLng(newLat, newLng);
+  }
+
+  void createMarkers() {
+    // Current location marker
+    markers.add(
+      Marker(
+        markerId: const MarkerId("rider"),
+        position: currentLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: "Your Location"),
+      ),
+    );
+
+    // Pickup location markers
+    for (int i = 0; i < pickupLocations.length; i++) {
+      markers.add(
+        Marker(
+          markerId: MarkerId("pickup$i"),
+          position: pickupLocations[i],
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueYellow,
           ),
-        );
-        setState(() {});
-      } else {
-        log("Failed to fetch polyline: ${polyline.errorMessage}");
-      }
-    } catch (e) {
-      log("Error while drawing route: $e");
+          infoWindow: InfoWindow(title: "Pickup ${i + 1}"),
+        ),
+      );
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body:
-          currentLocation == null
-              ? Center(child: CircularProgressIndicator())
-              : Stack(
-                children: [
-                  GoogleMap(
-                    onMapCreated: (controller) => mapController = controller,
-                    initialCameraPosition: CameraPosition(
-                      target: currentLocation!,
-                      zoom: 14,
-                    ),
-                    markers: markers,
-                    polylines: polylines,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                  ),
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    child: ElevatedButton(
-                      onPressed: _launchGoogleMaps,
-                      child: Text("Navigate"),
-                    ),
-                  ),
-                ],
-              ),
+    // Warehouse marker
+    markers.add(
+      Marker(
+        markerId: const MarkerId("warehouse"),
+        position: warehouseLocation,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: const InfoWindow(title: "Warehouse"),
+      ),
     );
   }
 
-  void _launchGoogleMaps() async {
-    if (currentLocation == null) {
-      log("Cannot launch maps: current location is null.");
-      return;
-    }
+  Future<void> createRoute() async {
+    // Create route connecting all points
+    final List<LatLng> routePoints = [
+      currentLocation!,
+      ...pickupLocations,
+      warehouseLocation,
+    ];
+
+    polylines.add(
+      Polyline(
+        polylineId: const PolylineId("deliveryroute"),
+        color: Colors.blue,
+        width: 5,
+        points: routePoints,
+      ),
+    );
+  }
+
+  void navigateToGoogleMaps() async {
+    if (currentLocation == null) return;
 
     final origin = "${currentLocation!.latitude},${currentLocation!.longitude}";
     final destination =
@@ -175,12 +156,85 @@ static const LatLng warehouseLocation = LatLng(12.961115, 77.600000);
       "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&waypoints=$waypoints",
     );
 
-    log("Launching Google Maps URL: $url");
-
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      log("Could not launch Google Maps.");
+    try {
+      if (await canLaunchUrl(url)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MapsWebview(url: url.toString()),
+          ),
+        );
+      } else {
+        showErrorSnackBar("Could not launch Google Maps");
+      }
+    } catch (e) {
+      showErrorSnackBar("Navigation error: $e");
     }
+  }
+
+  void showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Delivery Route'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Stack(
+                children: [
+                  GoogleMap(
+                    onMapCreated: (controller) => mapController = controller,
+                    initialCameraPosition: CameraPosition(
+                      target: currentLocation!,
+                      zoom: 14,
+                    ),
+                    markers: markers,
+                    polylines: polylines,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    zoomControlsEnabled: false,
+                  ),
+                  Positioned(
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                    child: buildNavigationButton(),
+                  ),
+                ],
+              ),
+    );
+  }
+
+  Widget buildNavigationButton() {
+    return ElevatedButton(
+      onPressed: navigateToGoogleMaps,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.directions),
+          SizedBox(width: 8),
+          Text(
+            "Start Navigation",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 }
